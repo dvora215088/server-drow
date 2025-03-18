@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using System.Diagnostics;
 using System.Text;
 using System.Text.Json.Serialization;
 
@@ -11,7 +10,6 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
-    // הוספת תמיכה ב-JWT ב-Swagger
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
         Description = "JWT Authorization header using the Bearer scheme. Example: \"Authorization: Bearer {token}\"",
@@ -42,6 +40,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
     ));
 
+// Get JWT key from environment variable or configuration
+string jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? 
+    builder.Configuration["JwtSettings:SecretKey"] ?? 
+    "SuperSecretKey12345678901234567890123456789012345678901234567890123456";
+
 // Add authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -49,7 +52,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes("SuperSecretKey12345678901234567890123456789012345678901234567890123456")),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
             ValidateIssuer = false,
             ValidateAudience = false,
             ClockSkew = TimeSpan.Zero
@@ -77,34 +80,17 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
+// Always enable Swagger in Render
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
-    {
-        // הוספת כפתור Authorize ב-Swagger UI
-        c.OAuthClientId("swagger-ui-client");
-        c.OAuthAppName("Swagger UI");
-    });
+    c.OAuthClientId("swagger-ui-client");
+    c.OAuthAppName("Swagger UI");
+});
 
-    // פתיחת Swagger אוטומטית בעת הפעלת השרת
-    app.Lifetime.ApplicationStarted.Register(() =>
-    {
-        var swaggerUrl = $"{app.Urls.FirstOrDefault()}/swagger"; // מוודא שהכתובת תואמת לשרת שלך
-        try
-        {
-            Process.Start(new ProcessStartInfo
-            {
-                FileName = swaggerUrl,
-                UseShellExecute = true
-            });
-        }
-        catch
-        {
-            // מתעלמים משגיאות פתיחת הדפדפן
-        }
-    });
-}
+// Remove automatic browser opening for Render
+// This code won't work in cloud environment
+// app.Lifetime.ApplicationStarted.Register(() => {...});
 
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
@@ -114,6 +100,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 // Map all endpoints
+app.MapGet("/", () => "welcome!:)");
 app.MapAuthEndpoints();
 app.MapCategoryEndpoints();
 app.MapWorksheetEndpoints();
