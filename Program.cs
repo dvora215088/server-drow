@@ -1,13 +1,20 @@
+using Amazon.S3;
+using Amazon.S3.Model;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Amazon.Runtime;
+using Amazon;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddEndpointsApiExplorer();
+
 builder.Services.AddSwaggerGen(c =>
 {
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
@@ -31,6 +38,27 @@ builder.Services.AddSwaggerGen(c =>
             new string[] {}
         }
     });
+});
+
+builder.Services.AddSingleton<IAmazonS3>(sp =>
+{
+    var options = new AmazonS3Config
+    {
+        RegionEndpoint = RegionEndpoint.GetBySystemName(Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1") // קריאת האזור ממערך משתני הסביבה
+    };
+
+    // קריאת credentials ממערך משתני הסביבה
+    var accessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
+    var secretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
+
+    if (string.IsNullOrEmpty(accessKeyId) || string.IsNullOrEmpty(secretAccessKey))
+    {
+        throw new InvalidOperationException("AWS credentials are missing.");
+    }
+
+    var credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
+
+    return new AmazonS3Client(credentials, options);
 });
 
 // Add DbContext with MySQL
@@ -88,10 +116,6 @@ app.UseSwaggerUI(c =>
     c.OAuthAppName("Swagger UI");
 });
 
-// Remove automatic browser opening for Render
-// This code won't work in cloud environment
-// app.Lifetime.ApplicationStarted.Register(() => {...});
-
 app.UseHttpsRedirection();
 app.UseCors("AllowAll");
 
@@ -107,5 +131,7 @@ app.MapWorksheetEndpoints();
 app.MapDownloadEndpoints();
 app.MapRatingEndpoints();
 app.MapFavoriteWorksheetEndpoints();
+app.MapUploadEndpoints();
 
 app.Run();
+
