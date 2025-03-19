@@ -69,11 +69,16 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
     ));
 
-// Get JWT key from environment variable or configuration
-string jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? 
-    builder.Configuration["JwtSettings:SecretKey"] ?? 
-    "SuperSecretKey12345678901234567890123456789012345678901234567890123456"; // ברירת מחדל במקרה שאין במשתנה סביבה
 
+
+
+string jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? 
+    builder.Configuration["JwtSettings:SecretKey"];
+
+if (string.IsNullOrEmpty(jwtKey))
+{
+    throw new InvalidOperationException("JWT secret key is not configured.");
+}
 // Add authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
