@@ -15,6 +15,7 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container
 builder.Services.AddEndpointsApiExplorer();
 
+// Swagger configuration
 builder.Services.AddSwaggerGen(c =>
 {
     c.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
@@ -24,6 +25,12 @@ builder.Services.AddSwaggerGen(c =>
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey
     });
+    var builder = WebApplication.CreateBuilder(args);
+
+// טוען את קובץ ה-configurations כמו appsettings.json
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+builder.Configuration.AddEnvironmentVariables();
+
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
         {
@@ -45,10 +52,9 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
 {
     var options = new AmazonS3Config
     {
-        RegionEndpoint = RegionEndpoint.GetBySystemName(Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1") // קריאת האזור ממערך משתני הסביבה
+        RegionEndpoint = RegionEndpoint.GetBySystemName(Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1")
     };
 
-    // קריאת credentials ממערך משתני הסביבה
     var accessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
     var secretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
 
@@ -69,17 +75,24 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
     ));
 
+// Configure JWT Secret Key dynamically based on environment
+var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
 
-
-
-string jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? 
-    builder.Configuration["JwtSettings:SecretKey"];
-
+// אם לא נמצא במשתני סביבה, ננסה להוציא מקובץ ההגדרות (appsettings.json)
 if (string.IsNullOrEmpty(jwtKey))
 {
-    throw new InvalidOperationException("JWT secret key is not configured.");
+    jwtKey = builder.Configuration["JwtSettings:SecretKey"];
 }
-// Add authentication
+
+// אם עדיין לא נמצא, נשתמש במפתח קבוע (למטרות פיתוח בלבד)
+if (string.IsNullOrEmpty(jwtKey))
+{
+    jwtKey = "MySuperSecretKeyForTestingOnly123456789012345678901234567890";
+}
+
+Console.WriteLine($"JWT Key configured with length: {jwtKey.Length}");
+
+// הגדרת אימות JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -91,9 +104,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = false,
             ClockSkew = TimeSpan.Zero
         };
+
+        options.Events = new JwtBearerEvents
+        {
+            OnAuthenticationFailed = context =>
+            {
+                Console.WriteLine($"Authentication failed: {context.Exception.Message}");
+                return Task.CompletedTask;
+            }
+        };
     });
 
-// Add authorization
+// הוספת שירותי הרשאה
+builder.Services.AddAuthorization();
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
+});
+
+// Add authorization services
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -114,7 +143,6 @@ builder.Services.AddCors(options =>
 var app = builder.Build();
 
 // Configure the HTTP request pipeline
-// Always enable Swagger in Render
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -131,6 +159,7 @@ app.UseAuthorization();
 
 // Map all endpoints
 app.MapGet("/", () => "welcome!:)");
+
 app.MapAuthEndpoints();
 app.MapCategoryEndpoints();
 app.MapWorksheetEndpoints();
