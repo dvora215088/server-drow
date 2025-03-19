@@ -40,6 +40,7 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
+// AWS S3 setup with credentials from environment variables
 builder.Services.AddSingleton<IAmazonS3>(sp =>
 {
     var options = new AmazonS3Config
@@ -71,7 +72,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 // Get JWT key from environment variable or configuration
 string jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY") ?? 
     builder.Configuration["JwtSettings:SecretKey"] ?? 
-    "SuperSecretKey12345678901234567890123456789012345678901234567890123456";
+    "SuperSecretKey12345678901234567890123456789012345678901234567890123456"; // ברירת מחדל במקרה שאין במשתנה סביבה
 
 // Add authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -134,4 +135,3 @@ app.MapFavoriteWorksheetEndpoints();
 app.MapUploadEndpoints();
 
 app.Run();
-
