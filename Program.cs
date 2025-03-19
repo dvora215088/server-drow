@@ -57,7 +57,9 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
 
     var accessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
     var secretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
-
+// הוסף את השורות האלה כדי להדפיס את משתני הסביבה
+    Console.WriteLine($"AWS Access Key ID: {accessKeyId}");
+    Console.WriteLine($"AWS Secret Access Key: {secretAccessKey}");
     if (string.IsNullOrEmpty(accessKeyId) || string.IsNullOrEmpty(secretAccessKey))
     {
         throw new InvalidOperationException("AWS credentials are missing.");
