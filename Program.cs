@@ -55,21 +55,19 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
         RegionEndpoint = RegionEndpoint.GetBySystemName(Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1")
     };
 
+    // קבל את האישורים ממשתני סביבה, לא בקוד!
     var accessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
     var secretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
-// הוסף את השורות האלה כדי להדפיס את משתני הסביבה
-    Console.WriteLine($"AWS Access Key ID: {accessKeyId}");
-    Console.WriteLine($"AWS Secret Access Key: {secretAccessKey}");
+ 
     if (string.IsNullOrEmpty(accessKeyId) || string.IsNullOrEmpty(secretAccessKey))
     {
-        throw new InvalidOperationException("AWS credentials are missing.");
+        throw new InvalidOperationException("AWS credentials are missing from environment variables.");
     }
 
     var credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
 
     return new AmazonS3Client(credentials, options);
 });
-
 // Add DbContext with MySQL
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
