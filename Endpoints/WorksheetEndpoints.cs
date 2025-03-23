@@ -42,9 +42,10 @@ public static class WorksheetEndpoints
 .Produces(StatusCodes.Status404NotFound);
 
 
+ 
 
-// חיפוש דפי עבודה לפי כותרת בסדר א-ב
-routes.MapGet("/api/worksheets/search/alphabetical", async (ApplicationDbContext context, string? startsWith = null, bool ascending = true) =>
+ // חיפוש דפי עבודה לפי קטגוריה בסדר א-ב
+routes.MapGet("/api/worksheets/search/category", async (ApplicationDbContext context, int? categoryId = null, string? startsWith = null, bool ascending = true) =>
 {
     try
     {
@@ -52,14 +53,20 @@ routes.MapGet("/api/worksheets/search/alphabetical", async (ApplicationDbContext
             .Include(w => w.Category)
             .Include(w => w.User);
         
-        // סינון לפי אות פותחת
+        // סינון לפי קטגוריה
+        if (categoryId.HasValue && categoryId > 0)
+        {
+            worksheetsQuery = worksheetsQuery.Where(w => w.CategoryId == categoryId.Value);
+        }
+        
+        // סינון לפי אות פותחת (אופציונלי)
         if (!string.IsNullOrWhiteSpace(startsWith))
         {
             worksheetsQuery = worksheetsQuery.Where(w => EF.Functions.Like(w.Title, startsWith + "%"));
         }
         
-        // מיון לפי סדר אלפביתי
-        worksheetsQuery = ascending 
+        // מיון לפי סדר אלפביתי של הכותרת
+        worksheetsQuery = ascending
             ? worksheetsQuery.OrderBy(w => w.Title)
             : worksheetsQuery.OrderByDescending(w => w.Title);
         
@@ -69,11 +76,12 @@ routes.MapGet("/api/worksheets/search/alphabetical", async (ApplicationDbContext
                 w.Id,
                 w.Title,
                 w.CategoryId,
+                CategoryName = w.Category != null ? w.Category.CategoryName : string.Empty,
                 w.AgeGroup,
                 w.Difficulty,
                 w.UserId,
-                FileCategory = w.Category != null ? w.Category.Id : 0,
-                User = w.User != null ? w.User.FirstName : string.Empty
+                UserName = w.User != null ? w.User.FirstName : string.Empty,
+                w.FileUrl
             })
             .ToListAsync();
         
@@ -81,13 +89,15 @@ routes.MapGet("/api/worksheets/search/alphabetical", async (ApplicationDbContext
     }
     catch (Exception ex)
     {
-        return Results.Problem($"שגיאה בחיפוש דפי עבודה: {ex.Message}", statusCode: 500);
+        return Results.Problem($"שגיאה בחיפוש דפי עבודה לפי קטגוריה: {ex.Message}", statusCode: 500);
     }
 })
-.WithName("SearchWorksheetsByAlphabet")
+.WithName("SearchWorksheetsByCategory")
 .WithTags("Worksheets")
 .Produces<List<object>>(StatusCodes.Status200OK)
 .Produces(StatusCodes.Status500InternalServerError);
+
+
         routes.MapPost("/api/worksheets/admin", [Authorize(Roles = "Admin")] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
         {
             var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
