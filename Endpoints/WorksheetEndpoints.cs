@@ -6,10 +6,12 @@ using Amazon.S3.Model;
 using Microsoft.AspNetCore.Mvc;
 public static class WorksheetEndpoints
 {
+    
     public static void MapWorksheetEndpoints(this IEndpointRouteBuilder routes)
     {
         routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
-{
+    { 
+
     var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
 
     // משתמש רגיל תמיד מוסיף לקטגוריה 1
@@ -42,92 +44,63 @@ public static class WorksheetEndpoints
 .Produces(StatusCodes.Status404NotFound);
 
 
- 
 
- // חיפוש דפי עבודה לפי קטגוריה בסדר א-ב
-routes.MapGet("/api/worksheets/search/category", async (ApplicationDbContext context, int? categoryId = null, string? startsWith = null, bool ascending = true) =>
-{
-    try
-    {
-        IQueryable<Worksheet> worksheetsQuery = context.Worksheets
-            .Include(w => w.Category)
-            .Include(w => w.User);
-        
-        // סינון לפי קטגוריה
-        if (categoryId.HasValue && categoryId > 0)
+
+        // חיפוש דפי עבודה לפי קטגוריה בסדר א-ב
+        routes.MapGet("/api/worksheets/search/category", async (ApplicationDbContext context, int? categoryId = null, string? startsWith = null, bool ascending = true) =>
         {
-            worksheetsQuery = worksheetsQuery.Where(w => w.CategoryId == categoryId.Value);
-        }
-        
-        // סינון לפי אות פותחת (אופציונלי)
-        if (!string.IsNullOrWhiteSpace(startsWith))
-        {
-            worksheetsQuery = worksheetsQuery.Where(w => EF.Functions.Like(w.Title, startsWith + "%"));
-        }
-        
-        // מיון לפי סדר אלפביתי של הכותרת
-        worksheetsQuery = ascending
-            ? worksheetsQuery.OrderBy(w => w.Title)
-            : worksheetsQuery.OrderByDescending(w => w.Title);
-        
-        var worksheets = await worksheetsQuery
-            .Select(w => new
+            try
             {
-                w.Id,
-                w.Title,
-                w.CategoryId,
-                CategoryName = w.Category != null ? w.Category.CategoryName : string.Empty,
-                w.AgeGroup,
-                w.Difficulty,
-                w.UserId,
-                UserName = w.User != null ? w.User.FirstName : string.Empty,
-                w.FileUrl
-            })
-            .ToListAsync();
-        
-        return Results.Ok(worksheets);
-    }
-    catch (Exception ex)
-    {
-        return Results.Problem($"שגיאה בחיפוש דפי עבודה לפי קטגוריה: {ex.Message}", statusCode: 500);
-    }
-})
-.WithName("SearchWorksheetsByCategory")
-.WithTags("Worksheets")
-.Produces<List<object>>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status500InternalServerError);
+                IQueryable<Worksheet> worksheetsQuery = context.Worksheets
+                    .Include(w => w.Category)
+                    .Include(w => w.User);
 
+                // סינון לפי קטגוריה
+                if (categoryId.HasValue && categoryId > 0)
+                {
+                    worksheetsQuery = worksheetsQuery.Where(w => w.CategoryId == categoryId.Value);
+                }
 
-        routes.MapPost("/api/worksheets/admin", [Authorize(Roles = "Admin")] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
-        {
-            var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+                // סינון לפי אות פותחת (אופציונלי)
+                if (!string.IsNullOrWhiteSpace(startsWith))
+                {
+                    worksheetsQuery = worksheetsQuery.Where(w => EF.Functions.Like(w.Title, startsWith + "%"));
+                }
 
-            // בדיקה אם הקטגוריה שהמנהל בחר קיימת
-            var category = await context.Categories.FindAsync(newWorksheet.CategoryId);
-            if (category == null)
-                return Results.NotFound("קטגוריה לא נמצאה.");
+                // מיון לפי סדר אלפביתי של הכותרת
+                worksheetsQuery = ascending
+                    ? worksheetsQuery.OrderBy(w => w.Title)
+                    : worksheetsQuery.OrderByDescending(w => w.Title);
 
-            // יצירת דף עבודה חדש
-            var worksheet = new Worksheet
+                var worksheets = await worksheetsQuery
+                    .Select(w => new
+                    {
+                        w.Id,
+                        w.Title,
+                        w.CategoryId,
+                        CategoryName = w.Category != null ? w.Category.CategoryName : string.Empty,
+                        w.AgeGroup,
+                        w.Difficulty,
+                        w.UserId,
+                        UserName = w.User != null ? w.User.FirstName : string.Empty,
+                        w.FileUrl
+                    })
+                    .ToListAsync();
+
+                return Results.Ok(worksheets);
+            }
+            catch (Exception ex)
             {
-                Title = newWorksheet.Title,
-                FileUrl = newWorksheet.FileUrl,
-                AgeGroup = newWorksheet.AgeGroup,
-                Difficulty = newWorksheet.Difficulty,
-                CategoryId = newWorksheet.CategoryId, // המנהל בוחר קטגוריה
-                UserId = userId
-            };
-
-            context.Worksheets.Add(worksheet);
-            await context.SaveChangesAsync();
-
-            return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
+                return Results.Problem($"שגיאה בחיפוש דפי עבודה לפי קטגוריה: {ex.Message}", statusCode: 500);
+            }
         })
-        .WithName("AddWorksheetAsAdmin")
+        .WithName("SearchWorksheetsByCategory")
         .WithTags("Worksheets")
-        .Produces<Worksheet>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status404NotFound);
+        .Produces<List<object>>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status500InternalServerError);
 
+
+       
         //קבלת דף עדפי עבודה לפי קטגוריה
         routes.MapGet("/api/worksheets/category/{categoryId}", async (int categoryId, ApplicationDbContext context) =>
         {
@@ -139,6 +112,7 @@ routes.MapGet("/api/worksheets/search/category", async (ApplicationDbContext con
                 {
                     w.Id,
                     w.Title,
+                    w.FileUrl,
                     w.CategoryId,
                     w.AgeGroup,
                     w.Difficulty,
@@ -204,6 +178,35 @@ routes.MapGet("/api/worksheets/search/category", async (ApplicationDbContext con
         .WithTags("Worksheets")
         .Produces<List<object>>(StatusCodes.Status200OK);
 
+ routes.MapPost("/api/worksheets/admin", [Authorize(Roles = "Admin")] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
+        {
+            var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+
+            // בדיקה אם הקטגוריה שהמנהל בחר קיימת
+            var category = await context.Categories.FindAsync(newWorksheet.CategoryId);
+            if (category == null)
+                return Results.NotFound("קטגוריה לא נמצאה.");
+
+            // יצירת דף עבודה חדש
+            var worksheet = new Worksheet
+            {
+                Title = newWorksheet.Title,
+                FileUrl = newWorksheet.FileUrl,
+                AgeGroup = newWorksheet.AgeGroup,
+                Difficulty = newWorksheet.Difficulty,
+                CategoryId = newWorksheet.CategoryId, // המנהל בוחר קטגוריה
+                UserId = userId
+            };
+
+            context.Worksheets.Add(worksheet);
+            await context.SaveChangesAsync();
+
+            return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
+        })
+        .WithName("AddWorksheetAsAdmin")
+        .WithTags("Worksheets")
+        .Produces<Worksheet>(StatusCodes.Status201Created)
+        .Produces(StatusCodes.Status404NotFound);
 
 
         // // עדכון דף עבודה
