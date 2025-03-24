@@ -12,6 +12,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Rating> Ratings { get; set; }
     public DbSet<Category> Categories { get; set; }
     public DbSet<FavoriteWorksheet> FavoriteWorksheets { get; set; }
+    public object DownloadLogs { get; internal set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

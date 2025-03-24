@@ -300,24 +300,6 @@ public static class WorksheetEndpoints
         .Produces<Worksheet>(StatusCodes.Status200OK);
     }
 
-    public static void MapDownloadEndpoints(this IEndpointRouteBuilder routes)
-    {
-        // הורדת דף עבודה
-        routes.MapGet("/api/worksheets/{id}/download", [Authorize] async (int id, ApplicationDbContext context) =>
-        {
-            var worksheet = await context.Worksheets.FindAsync(id);
-            if (worksheet == null)
-                return Results.NotFound();
-
-            // בפועל כאן אפשר לממש לוגיקת הורדה, אך כרגע רק מחזירים את הקישור
-            return Results.Ok(new { DownloadUrl = worksheet.FileUrl });
-        })
-        .WithName("DownloadWorksheet")
-        .WithTags("Worksheets")
-        .Produces<object>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status404NotFound);
-
-
-    }
-
+   
+  
 }

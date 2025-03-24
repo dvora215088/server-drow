@@ -12,8 +12,21 @@ using Amazon;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// טוען את קובץ ה-configurations כמו appsettings.json
+builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+builder.Configuration.AddEnvironmentVariables();
+
 // Add services to the container
 builder.Services.AddEndpointsApiExplorer();
+
+// רישום IHttpClientFactory - חשוב!
+builder.Services.AddHttpClient();
+
+// רישום HttpClient ספציפי עבור S3
+builder.Services.AddHttpClient("S3Client", client => {
+    // אפשר להוסיף כאן הגדרות ספציפיות לקליינט S3
+    client.Timeout = TimeSpan.FromMinutes(2);
+});
 
 // Swagger configuration
 builder.Services.AddSwaggerGen(c =>
@@ -25,11 +38,6 @@ builder.Services.AddSwaggerGen(c =>
         In = Microsoft.OpenApi.Models.ParameterLocation.Header,
         Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey
     });
-    var builder = WebApplication.CreateBuilder(args);
-
-// טוען את קובץ ה-configurations כמו appsettings.json
-builder.Configuration.AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-builder.Configuration.AddEnvironmentVariables();
 
     c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
     {
@@ -68,6 +76,7 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
 
     return new AmazonS3Client(credentials, options);
 });
+
 // Add DbContext with MySQL
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
@@ -116,13 +125,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 // הוספת שירותי הרשאה
-builder.Services.AddAuthorization();
-builder.Services.ConfigureHttpJsonOptions(options =>
-{
-    options.SerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
-});
-
-// Add authorization services
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
