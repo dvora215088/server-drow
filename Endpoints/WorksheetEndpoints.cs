@@ -298,6 +298,62 @@ public static class WorksheetEndpoints
         .WithName("AssignWorksheetToCategory")
         .WithTags("Worksheets")
         .Produces<Worksheet>(StatusCodes.Status200OK);
+
+        // קבלת דף עבודה רנדומלי לפי קטגוריה
+routes.MapGet("/api/worksheets/random/category/{categoryId}", async (int categoryId, ApplicationDbContext context) =>
+{
+    try
+    {
+        // בדיקה שהקטגוריה קיימת
+        var category = await context.Categories.FindAsync(categoryId);
+        if (category == null)
+            return Results.NotFound($"קטגוריה עם מזהה {categoryId} לא נמצאה.");
+
+        // בדיקה שיש דפי עבודה בקטגוריה
+        var worksheetCount = await context.Worksheets
+            .Where(w => w.CategoryId == categoryId)
+            .CountAsync();
+
+        if (worksheetCount == 0)
+            return Results.NotFound($"לא נמצאו דפי עבודה בקטגוריה {category.CategoryName}.");
+
+        // בחירת מספר רנדומלי בטווח מספר דפי העבודה
+        var random = new Random();
+        var randomIndex = random.Next(0, worksheetCount);
+
+        // קבלת דף העבודה הרנדומלי
+        var randomWorksheet = await context.Worksheets
+            .Where(w => w.CategoryId == categoryId)
+            .Include(w => w.Category)
+            .Include(w => w.User)
+            .Skip(randomIndex)
+            .Take(1)
+            .Select(w => new
+            {
+                w.Id,
+                w.Title,
+                w.FileUrl,
+                w.CategoryId,
+                w.AgeGroup,
+                w.Difficulty,
+                w.UserId,
+                CategoryName = w.Category.CategoryName,
+                UserName = w.User.FirstName
+            })
+            .FirstOrDefaultAsync();
+
+        return Results.Ok(randomWorksheet);
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"שגיאה בקבלת דף עבודה רנדומלי: {ex.Message}", statusCode: 500);
+    }
+})
+.WithName("GetRandomWorksheetByCategory")
+.WithTags("Worksheets")
+.Produces<object>(StatusCodes.Status200OK)
+.Produces(StatusCodes.Status404NotFound)
+.Produces(StatusCodes.Status500InternalServerError);
     }
 
    
