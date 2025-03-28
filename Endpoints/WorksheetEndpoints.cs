@@ -6,38 +6,38 @@ using Amazon.S3.Model;
 using Microsoft.AspNetCore.Mvc;
 public static class WorksheetEndpoints
 {
-    
+
     public static void MapWorksheetEndpoints(this IEndpointRouteBuilder routes)
     {
         routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
-    { 
-
-    var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
-
-    // משתמש רגיל תמיד מוסיף לקטגוריה 1
-    const int defaultCategoryId = 1;
-
-    // בדיקה אם הקטגוריה 1 קיימת
-    var category = await context.Categories.FindAsync(defaultCategoryId);
-    if (category == null)
-        return Results.NotFound("קטגוריה ברירת מחדל לא נמצאה.");
-
-    // יצירת דף עבודה חדש
-    var worksheet = new Worksheet
     {
-        Title = newWorksheet.Title,
-        FileUrl = newWorksheet.FileUrl,
-        AgeGroup = newWorksheet.AgeGroup,
-        Difficulty = newWorksheet.Difficulty,
-        CategoryId = defaultCategoryId, // תמיד קטגוריה 1
-        UserId = userId
-    };
 
-    context.Worksheets.Add(worksheet);
-    await context.SaveChangesAsync();
+        var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
 
-    return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
-})
+        // משתמש רגיל תמיד מוסיף לקטגוריה 1
+        const int defaultCategoryId = 1;
+
+        // בדיקה אם הקטגוריה 1 קיימת
+        var category = await context.Categories.FindAsync(defaultCategoryId);
+        if (category == null)
+            return Results.NotFound("קטגוריה ברירת מחדל לא נמצאה.");
+
+        // יצירת דף עבודה חדש
+        var worksheet = new Worksheet
+        {
+            Title = newWorksheet.Title,
+            FileUrl = newWorksheet.FileUrl,
+            AgeGroup = newWorksheet.AgeGroup,
+            Difficulty = newWorksheet.Difficulty,
+            CategoryId = defaultCategoryId, // תמיד קטגוריה 1
+            UserId = userId
+        };
+
+        context.Worksheets.Add(worksheet);
+        await context.SaveChangesAsync();
+
+        return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
+    })
 .WithName("AddWorksheetForUser")
 .WithTags("Worksheets")
 .Produces<Worksheet>(StatusCodes.Status201Created)
@@ -100,7 +100,7 @@ public static class WorksheetEndpoints
         .Produces(StatusCodes.Status500InternalServerError);
 
 
-       
+
         //קבלת דף עדפי עבודה לפי קטגוריה
         routes.MapGet("/api/worksheets/category/{categoryId}", async (int categoryId, ApplicationDbContext context) =>
         {
@@ -178,35 +178,35 @@ public static class WorksheetEndpoints
         .WithTags("Worksheets")
         .Produces<List<object>>(StatusCodes.Status200OK);
 
- routes.MapPost("/api/worksheets/admin", [Authorize(Roles = "Admin")] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
-        {
-            var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+        routes.MapPost("/api/worksheets/admin", [Authorize(Roles = "Admin")] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
+               {
+                   var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
 
-            // בדיקה אם הקטגוריה שהמנהל בחר קיימת
-            var category = await context.Categories.FindAsync(newWorksheet.CategoryId);
-            if (category == null)
-                return Results.NotFound("קטגוריה לא נמצאה.");
+                   // בדיקה אם הקטגוריה שהמנהל בחר קיימת
+                   var category = await context.Categories.FindAsync(newWorksheet.CategoryId);
+                   if (category == null)
+                       return Results.NotFound("קטגוריה לא נמצאה.");
 
-            // יצירת דף עבודה חדש
-            var worksheet = new Worksheet
-            {
-                Title = newWorksheet.Title,
-                FileUrl = newWorksheet.FileUrl,
-                AgeGroup = newWorksheet.AgeGroup,
-                Difficulty = newWorksheet.Difficulty,
-                CategoryId = newWorksheet.CategoryId, // המנהל בוחר קטגוריה
-                UserId = userId
-            };
+                   // יצירת דף עבודה חדש
+                   var worksheet = new Worksheet
+                   {
+                       Title = newWorksheet.Title,
+                       FileUrl = newWorksheet.FileUrl,
+                       AgeGroup = newWorksheet.AgeGroup,
+                       Difficulty = newWorksheet.Difficulty,
+                       CategoryId = newWorksheet.CategoryId, // המנהל בוחר קטגוריה
+                       UserId = userId
+                   };
 
-            context.Worksheets.Add(worksheet);
-            await context.SaveChangesAsync();
+                   context.Worksheets.Add(worksheet);
+                   await context.SaveChangesAsync();
 
-            return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
-        })
-        .WithName("AddWorksheetAsAdmin")
-        .WithTags("Worksheets")
-        .Produces<Worksheet>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status404NotFound);
+                   return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
+               })
+               .WithName("AddWorksheetAsAdmin")
+               .WithTags("Worksheets")
+               .Produces<Worksheet>(StatusCodes.Status201Created)
+               .Produces(StatusCodes.Status404NotFound);
 
 
         // // עדכון דף עבודה
@@ -299,63 +299,83 @@ public static class WorksheetEndpoints
         .WithTags("Worksheets")
         .Produces<Worksheet>(StatusCodes.Status200OK);
 
-        // קבלת דף עבודה רנדומלי לפי קטגוריה
-routes.MapGet("/api/worksheets/random/category/{categoryId}", async (int categoryId, ApplicationDbContext context) =>
+    routes.MapGet("/api/worksheets/by-categories", async (ApplicationDbContext context) =>
 {
     try
     {
-        // בדיקה שהקטגוריה קיימת
-        var category = await context.Categories.FindAsync(categoryId);
-        if (category == null)
-            return Results.NotFound($"קטגוריה עם מזהה {categoryId} לא נמצאה.");
-
-        // בדיקה שיש דפי עבודה בקטגוריה
-        var worksheetCount = await context.Worksheets
-            .Where(w => w.CategoryId == categoryId)
-            .CountAsync();
-
-        if (worksheetCount == 0)
-            return Results.NotFound($"לא נמצאו דפי עבודה בקטגוריה {category.CategoryName}.");
-
-        // בחירת מספר רנדומלי בטווח מספר דפי העבודה
-        var random = new Random();
-        var randomIndex = random.Next(0, worksheetCount);
-
-        // קבלת דף העבודה הרנדומלי
-        var randomWorksheet = await context.Worksheets
-            .Where(w => w.CategoryId == categoryId)
-            .Include(w => w.Category)
-            .Include(w => w.User)
-            .Skip(randomIndex)
-            .Take(1)
-            .Select(w => new
+        // קבלת כל הקטגוריות
+        var categories = await context.Categories.ToListAsync();
+        
+        // מיכל לתוצאות
+        var results = new List<object>();
+        
+        // עבור על כל קטגוריה ומצא דף עבודה רנדומלי או ראשון
+        foreach (var category in categories)
+        {
+            // בדיקה אם יש דפי עבודה בקטגוריה
+            var worksheetCount = await context.Worksheets
+                .Where(w => w.CategoryId == category.Id)
+                .CountAsync();
+                
+            if (worksheetCount == 0)
             {
-                w.Id,
-                w.Title,
-                w.FileUrl,
-                w.CategoryId,
-                w.AgeGroup,
-                w.Difficulty,
-                w.UserId,
-                CategoryName = w.Category.CategoryName,
-                UserName = w.User.FirstName
-            })
-            .FirstOrDefaultAsync();
-
-        return Results.Ok(randomWorksheet);
+                // אין דפי עבודה בקטגוריה זו - נוסיף אובייקט עם מידע בסיסי
+                results.Add(new
+                {
+                    CategoryId = category.Id,
+                    CategoryName = category.CategoryName,
+                    HasWorksheet = false,
+                    Worksheet = (object)null
+                });
+                continue;
+            }
+            
+            // בחירת מספר רנדומלי או פשוט לקחת את הראשון
+            int skipCount = 0;
+            if (worksheetCount > 1)
+            {
+                var random = new Random();
+                skipCount = random.Next(0, worksheetCount);
+            }
+            
+            var worksheet = await context.Worksheets
+                .Where(w => w.CategoryId == category.Id)
+                .Include(w => w.User)
+                .Skip(skipCount)
+                .Take(1)
+                .Select(w => new
+                {
+                    w.Id,
+                    w.Title,
+                    w.FileUrl,
+                    w.CategoryId,
+                    w.AgeGroup,
+                    w.Difficulty,
+                    w.UserId,
+                    UserName = w.User.FirstName
+                })
+                .FirstOrDefaultAsync();
+                
+            // הוספת התוצאה למיכל התוצאות
+            results.Add(new
+            {
+                CategoryId = category.Id,
+                CategoryName = category.CategoryName,
+                HasWorksheet = true,
+                Worksheet = worksheet
+            });
+        }
+        
+        return Results.Ok(results);
     }
     catch (Exception ex)
     {
-        return Results.Problem($"שגיאה בקבלת דף עבודה רנדומלי: {ex.Message}", statusCode: 500);
+        return Results.Problem($"שגיאה בקבלת דפי עבודה: {ex.Message}", statusCode: 500);
     }
 })
-.WithName("GetRandomWorksheetByCategory")
+.WithName("GetWorksheetsByCategories")
 .WithTags("Worksheets")
 .Produces<object>(StatusCodes.Status200OK)
-.Produces(StatusCodes.Status404NotFound)
-.Produces(StatusCodes.Status500InternalServerError);
-    }
+.Produces(StatusCodes.Status500InternalServerError);}
 
-   
-  
 }
