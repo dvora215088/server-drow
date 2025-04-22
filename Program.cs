@@ -134,11 +134,12 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Add CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowAll", builder =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        builder.AllowAnyOrigin()
-               .AllowAnyMethod()
-               .AllowAnyHeader();
+        policy.WithOrigins("http://localhost:5173") // או הדומיין של הפרונט שלך ב-production
+              .AllowAnyMethod()
+              .AllowAnyHeader()
+              .AllowCredentials(); // חשוב אם יש Authorization או Cookies
     });
 });
 
@@ -153,7 +154,7 @@ app.UseSwaggerUI(c =>
 });
 
 app.UseHttpsRedirection();
-app.UseCors("AllowAll");
+app.UseCors("AllowFrontend");
 
 // Authentication & Authorization middleware
 app.UseAuthentication();
