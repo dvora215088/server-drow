@@ -9,7 +9,7 @@ public static class UploadEndpoints
         routes.MapGet("/api/upload/presigned-url", [Authorize] async (IAmazonS3 s3Client, string fileName, HttpContext httpContext) =>
         {
             // שם הדלי יכול להיות מוגדר בקונפיגורציה או כאן באופן סטטי
-            string bucketName = "drows-testpnoren"; 
+            string bucketName = "drows.testpnoren"; 
             
             var request = new GetPreSignedUrlRequest
             {
@@ -17,10 +17,10 @@ public static class UploadEndpoints
                 Key = fileName,
                 Verb = HttpVerb.PUT,
                 Expires = DateTime.UtcNow.AddMinutes(5),
-                ContentType = "png/pdf" // או סוג הקובץ המתאים לדפי עבודה
+                ContentType = "png/jpg" // או סוג הקובץ המתאים לדפי עבודה
             };
 
-            string url = s3Client.GetPreSignedURL(request);
+            string url=s3Client.GetPreSignedURL(request);
             
             return Results.Ok(new { url });
         })
