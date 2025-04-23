@@ -9,40 +9,36 @@ public static class WorksheetEndpoints
 
     public static void MapWorksheetEndpoints(this IEndpointRouteBuilder routes)
     {
-        routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
+      // יצירת דף עבודה חדש
+routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
+{
+    var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+
+    const int defaultCategoryId = 1;
+
+    var category = await context.Categories.FindAsync(defaultCategoryId);
+    if (category == null)
+        return Results.NotFound("קטגוריה ברירת מחדל לא נמצאה.");
+
+    var worksheet = new Worksheet
     {
+        Title = newWorksheet.Title,
+        FileUrl = newWorksheet.FileUrl,  // הקישור שיתקבל מ-S3
+        AgeGroup = newWorksheet.AgeGroup,
+        Difficulty = newWorksheet.Difficulty,
+        CategoryId = defaultCategoryId,
+        UserId = userId
+    };
 
-        var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+    context.Worksheets.Add(worksheet);
+    await context.SaveChangesAsync();
 
-        // משתמש רגיל תמיד מוסיף לקטגוריה 1
-        const int defaultCategoryId = 1;
-
-        // בדיקה אם הקטגוריה 1 קיימת
-        var category = await context.Categories.FindAsync(defaultCategoryId);
-        if (category == null)
-            return Results.NotFound("קטגוריה ברירת מחדל לא נמצאה.");
-
-        // יצירת דף עבודה חדש
-        var worksheet = new Worksheet
-        {
-            Title = newWorksheet.Title,
-            FileUrl = newWorksheet.FileUrl,
-            AgeGroup = newWorksheet.AgeGroup,
-            Difficulty = newWorksheet.Difficulty,
-            CategoryId = defaultCategoryId, // תמיד קטגוריה 1
-            UserId = userId
-        };
-
-        context.Worksheets.Add(worksheet);
-        await context.SaveChangesAsync();
-
-        return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
-    })
+    return Results.Created($"/api/worksheets/{worksheet.Id}", worksheet);
+})
 .WithName("AddWorksheetForUser")
 .WithTags("Worksheets")
 .Produces<Worksheet>(StatusCodes.Status201Created)
 .Produces(StatusCodes.Status404NotFound);
-
 
 
 
