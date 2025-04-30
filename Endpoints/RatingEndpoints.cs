@@ -6,35 +6,38 @@ public static class RatingEndpoints
 {
     public static void MapRatingEndpoints(this IEndpointRouteBuilder routes)
     {
-       routes.MapPost("/api/ratings", [Authorize] async (Rating rating, ApplicationDbContext context, HttpContext httpContext) =>
-{
-    var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+        routes.MapPost("/api/ratings", [Authorize] async (Rating ratingRequest, ApplicationDbContext context, HttpContext httpContext) =>
+        {
+            var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
 
-    var existingRating = await context.Ratings
-        .FirstOrDefaultAsync(r => r.WorksheetId == rating.WorksheetId && r.UserId == userId);
+            var existingRating = await context.Ratings
+                .FirstOrDefaultAsync(r => r.WorksheetId == ratingRequest.WorksheetId && r.UserId == userId);
 
-    if (existingRating != null)
-    {
-        // עדכון דירוג קיים
-        existingRating.RatingValue = rating.RatingValue;
-        existingRating.Review = rating.Review;
-        await context.SaveChangesAsync();
-        return Results.Ok(existingRating); // מחזיר סטטוס 200
-    }
+            if (existingRating != null)
+            {
+                // עדכון דירוג קיים
+                existingRating.RatingValue = ratingRequest.RatingValue;
+                await context.SaveChangesAsync();
+                return Results.Ok(existingRating);
+            }
 
-    // יצירת דירוג חדש
-    rating.UserId = userId;
-    rating.CreatedAt = DateTime.Now;
+            // יצירת דירוג חדש
+            var rating = new Rating
+            {
+                WorksheetId = ratingRequest.WorksheetId,
+                RatingValue = ratingRequest.RatingValue,
+                UserId = userId,
+            };
 
-    await context.Ratings.AddAsync(rating);
-    await context.SaveChangesAsync();
+            await context.Ratings.AddAsync(rating);
+            await context.SaveChangesAsync();
 
-    return Results.Created($"/api/ratings/{rating.Id}", rating);
-})
-.WithName("CreateOrUpdateRating")
-.WithTags("Ratings")
-.Produces<Rating>(StatusCodes.Status200OK)
-.Produces<Rating>(StatusCodes.Status201Created);
+            return Results.Created($"/api/ratings/{rating.Id}", rating);
+        })
+        .WithName("CreateOrUpdateRating")
+        .WithTags("Ratings")
+        .Produces<Rating>(StatusCodes.Status200OK)
+        .Produces<Rating>(StatusCodes.Status201Created);
 
         // קבלת כל הדירוגים עבור דף עבודה
         routes.MapGet("/api/worksheets/{worksheetId}/ratings", async (int worksheetId, ApplicationDbContext context) =>
@@ -43,30 +46,30 @@ public static class RatingEndpoints
                 .Where(r => r.WorksheetId == worksheetId)
                 .Include(r => r.User)
                 .ToListAsync();
-                
+
             return Results.Ok(ratings);
         })
         .WithName("GetRatingsByWorksheet")
         .WithTags("Ratings")
         .Produces<List<Rating>>(StatusCodes.Status200OK);
-        
+
         // מחיקת דירוג
         routes.MapDelete("/api/ratings/{id}", [Authorize] async (int id, ApplicationDbContext context, HttpContext httpContext) =>
         {
             var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
             var isAdmin = httpContext.User.IsInRole("Admin");
-            
+
             var rating = await context.Ratings.FindAsync(id);
             if (rating == null)
                 return Results.NotFound();
-                
+
             // רק המשתמש שיצר את הדירוג או מנהל יכולים למחוק
             if (rating.UserId != userId && !isAdmin)
                 return Results.Forbid();
-                
+
             context.Ratings.Remove(rating);
             await context.SaveChangesAsync();
-            
+
             return Results.NoContent();
         })
         .WithName("DeleteRating")
