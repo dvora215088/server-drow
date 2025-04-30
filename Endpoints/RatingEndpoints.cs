@@ -6,57 +6,36 @@ public static class RatingEndpoints
 {
     public static void MapRatingEndpoints(this IEndpointRouteBuilder routes)
     {
-        // הוספת דירוג לדף עבודה
-        routes.MapPost("/api/ratings", [Authorize] async (Rating rating, ApplicationDbContext context, HttpContext httpContext) =>
-        {
-            var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            
-            // בדיקה אם המשתמש כבר דירג את דף העבודה הזה
-            var existingRating = await context.Ratings
-                .FirstOrDefaultAsync(r => r.WorksheetId == rating.WorksheetId && r.UserId == userId);
-                
-            if (existingRating != null)
-                return Results.BadRequest("כבר דירגת את דף העבודה הזה");
-                
-            // הגדרת המשתמש המדרג
-            rating.UserId = userId;
-            rating.CreatedAt = DateTime.Now;
-            
-            await context.Ratings.AddAsync(rating);
-            await context.SaveChangesAsync();
-            
-            return Results.Created($"/api/ratings/{rating.Id}", rating);
-        })
-        .WithName("CreateRating")
-        .WithTags("Ratings")
-        .Produces<Rating>(StatusCodes.Status201Created)
-        .Produces(StatusCodes.Status400BadRequest);
-        
+       routes.MapPost("/api/ratings", [Authorize] async (Rating rating, ApplicationDbContext context, HttpContext httpContext) =>
+{
+    var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+
+    var existingRating = await context.Ratings
+        .FirstOrDefaultAsync(r => r.WorksheetId == rating.WorksheetId && r.UserId == userId);
+
+    if (existingRating != null)
+    {
         // עדכון דירוג קיים
-        routes.MapPut("/api/ratings/{id}", [Authorize] async (int id, Rating updatedRating, ApplicationDbContext context, HttpContext httpContext) =>
-        {
-            var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            
-            var rating = await context.Ratings.FindAsync(id);
-            if (rating == null)
-                return Results.NotFound();
-                
-            // רק המשתמש שיצר את הדירוג יכול לעדכן אותו
-            if (rating.UserId != userId)
-                return Results.Forbid();
-                
-            rating.RatingValue = updatedRating.RatingValue;
-            rating.Review = updatedRating.Review;
-            
-            await context.SaveChangesAsync();
-            return Results.Ok(rating);
-        })
-        .WithName("UpdateRating")
-        .WithTags("Ratings")
-        .Produces<Rating>(StatusCodes.Status200OK)
-        .Produces(StatusCodes.Status404NotFound)
-        .Produces(StatusCodes.Status403Forbidden);
-        
+        existingRating.RatingValue = rating.RatingValue;
+        existingRating.Review = rating.Review;
+        await context.SaveChangesAsync();
+        return Results.Ok(existingRating); // מחזיר סטטוס 200
+    }
+
+    // יצירת דירוג חדש
+    rating.UserId = userId;
+    rating.CreatedAt = DateTime.Now;
+
+    await context.Ratings.AddAsync(rating);
+    await context.SaveChangesAsync();
+
+    return Results.Created($"/api/ratings/{rating.Id}", rating);
+})
+.WithName("CreateOrUpdateRating")
+.WithTags("Ratings")
+.Produces<Rating>(StatusCodes.Status200OK)
+.Produces<Rating>(StatusCodes.Status201Created);
+
         // קבלת כל הדירוגים עבור דף עבודה
         routes.MapGet("/api/worksheets/{worksheetId}/ratings", async (int worksheetId, ApplicationDbContext context) =>
         {
