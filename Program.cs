@@ -134,13 +134,17 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Add CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173") // או הדומיין של הפרונט שלך ב-production
-              .AllowAnyMethod()
-              .AllowAnyHeader()
-              .AllowCredentials(); // חשוב אם יש Authorization או Cookies
-    });
+  options.AddPolicy("AllowFrontend", policy =>
+{
+    policy.WithOrigins(
+        "http://localhost:5173",
+        "https://react-drow.onrender.com"
+    )
+    .AllowAnyMethod()
+    .AllowAnyHeader()
+    .AllowCredentials(); // חשוב אם יש Authorization או Cookies
+});
+
 });
 
 var app = builder.Build();

@@ -125,5 +125,4 @@ public static class DownloadEndpoints
         .Produces(StatusCodes.Status500InternalServerError);
     }
     
-    // פונקציה לתיעוד הורדות (אופציונלי)
 }
