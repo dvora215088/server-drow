@@ -138,7 +138,9 @@ builder.Services.AddCors(options =>
 {
     policy.WithOrigins(
         "http://localhost:5173",
-        "https://react-drow.onrender.com"
+        "https://react-drow.onrender.com",
+        "http://localhost:4200",
+        "https://angular-drow-manager.onrender.com"
     )
     .AllowAnyMethod()
     .AllowAnyHeader()
