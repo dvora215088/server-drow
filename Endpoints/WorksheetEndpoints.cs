@@ -260,21 +260,22 @@ routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, App
         .Produces(StatusCodes.Status403Forbidden);
 
         // קבלת כל דפי העבודה כולל משובים ודירוגים - רק למנהל
-        routes.MapGet("/api/worksheets/admin/all-with-ratings", [Authorize(Roles = "Admin")] async (ApplicationDbContext context) =>
+       routes.MapGet("/api/worksheets/admin/all-with-ratings", [Authorize(Roles = "Admin")] async (ApplicationDbContext context) =>
+{
+    var worksheets = await context.Worksheets
+        .Select(w => new 
         {
-            var worksheets = await context.Worksheets
-                .Include(w => w.Category)
-                .Include(w => w.User)
-                .Include(w => w.Ratings)
-                    .ThenInclude(r => r.User)
-                .ToListAsync();
-
-            return Results.Ok(worksheets);
+            Title = w.Title,
+            CategoryName = w.Category.CategoryName,
+            AverageRating = w.Ratings.Any() ? w.Ratings.Average(r => r.RatingValue) : 0
         })
-        .WithName("GetAllWorksheetsWithRatings")
-        .WithTags("Worksheets")
-        .Produces<List<Worksheet>>(StatusCodes.Status200OK);
+        .ToListAsync();
 
+    return Results.Ok(worksheets);
+})
+.WithName("GetAllWorksheetsWithRatings")
+.WithTags("Worksheets")
+.Produces<List<object>>(StatusCodes.Status200OK);
         // הוספת דף עבודה לקטגוריה - רק למנהל
         routes.MapPut("/api/worksheets/{id}/category/{categoryId}", [Authorize(Roles = "Admin")] async (int id, int categoryId, ApplicationDbContext context) =>
         {
