@@ -205,34 +205,34 @@ routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, App
                .Produces(StatusCodes.Status404NotFound);
 
 
-        // // עדכון דף עבודה
-        // routes.MapPut("/api/worksheets/{id}", [Authorize] async (int id, Worksheet updatedWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
-        // {
-        //     var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
-        //     var isAdmin = httpContext.User.IsInRole("Admin");
+        // עדכון דף עבודה
+        routes.MapPut("/api/worksheets/{id}", [Authorize] async (int id, Worksheet updatedWorksheet, ApplicationDbContext context, HttpContext httpContext) =>
+        {
+            var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
+            var isAdmin = httpContext.User.IsInRole("Admin");
 
-        //     var worksheet = await context.Worksheets.FindAsync(id);
-        //     if (worksheet == null)
-        //         return Results.NotFound();
+            var worksheet = await context.Worksheets.FindAsync(id);
+            if (worksheet == null)
+                return Results.NotFound();
 
-        //     // רק בעל הדף או מנהל יכולים לעדכן
-        //     if (worksheet.UserId != userId && !isAdmin)
-        //         return Results.Forbid();
+            // רק בעל הדף או מנהל יכולים לעדכן
+            if (worksheet.UserId != userId && !isAdmin)
+                return Results.Forbid();
 
-        //     worksheet.Title = updatedWorksheet.Title;
-        //     worksheet.FileUrl = updatedWorksheet.FileUrl;
-        //     worksheet.AgeGroup = updatedWorksheet.AgeGroup;
-        //     worksheet.Difficulty = updatedWorksheet.Difficulty;
-        //     worksheet.CategoryId = updatedWorksheet.CategoryId;
+            worksheet.Title = updatedWorksheet.Title;
+            worksheet.FileUrl = updatedWorksheet.FileUrl;
+            worksheet.AgeGroup = updatedWorksheet.AgeGroup;
+            worksheet.Difficulty = updatedWorksheet.Difficulty;
+            worksheet.CategoryId = updatedWorksheet.CategoryId;
 
-        //     await context.SaveChangesAsync();
-        //     return Results.Ok(worksheet);
-        // })
-        // .WithName("UpdateWorksheet")
-        // .WithTags("Worksheets")
-        // .Produces<Worksheet>(StatusCodes.Status200OK)
-        // .Produces(StatusCodes.Status404NotFound)
-        // .Produces(StatusCodes.Status403Forbidden);
+            await context.SaveChangesAsync();
+            return Results.Ok(worksheet);
+        })
+        .WithName("UpdateWorksheet")
+        .WithTags("Worksheets")
+        .Produces<Worksheet>(StatusCodes.Status200OK)
+        .Produces(StatusCodes.Status404NotFound)
+        .Produces(StatusCodes.Status403Forbidden);
 
         // מחיקת דף עבודה - רק למנהל או למשתמש שיצר את הדף
         routes.MapDelete("/api/worksheets/{id}", [Authorize] async (int id, ApplicationDbContext context, HttpContext httpContext) =>
@@ -265,9 +265,11 @@ routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, App
     var worksheets = await context.Worksheets
         .Select(w => new 
         {
+            Id=w.Id,
             Title = w.Title,
             CategoryName = w.Category.CategoryName,
-            AverageRating = w.Ratings.Any() ? w.Ratings.Average(r => r.RatingValue) : 0
+            AverageRating = w.Ratings.Any() ? w.Ratings.Average(r => r.RatingValue) : 0,
+            Url=w.FileUrl
         })
         .ToListAsync();
 
@@ -359,7 +361,8 @@ routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, App
                 CategoryId = category.Id,
                 CategoryName = category.CategoryName,
                 HasWorksheet = true,
-                Worksheet = worksheet
+                Worksheet = worksheet,
+                
             });
         }
         
