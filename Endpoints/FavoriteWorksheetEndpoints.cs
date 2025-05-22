@@ -23,33 +23,33 @@ public static class FavoriteWorksheetEndpoints
         .WithName("GetUserFavorites")
         .WithTags("Favorites")
         .Produces<List<FavoriteWorksheet>>(StatusCodes.Status200OK);
-        
+
         // הוספת דף עבודה למועדפים
-        routes.MapPost("/api/favorites", [Authorize] async (FavoriteWorksheetDto favoriteDto, ApplicationDbContext context, HttpContext httpContext) =>
+        _ = routes.MapPost("/api/favorites", [Authorize] async (FavoriteWorksheetDto favoriteDto, ApplicationDbContext context, HttpContext httpContext) =>
         {
             var userId = int.Parse(httpContext.User.FindFirst(ClaimTypes.NameIdentifier).Value);
-            
+
             // בדיקה אם דף העבודה כבר במועדפים
             var existingFavorite = await context.FavoriteWorksheets
                 .FirstOrDefaultAsync(f => f.WorksheetId == favoriteDto.WorksheetId && f.UserId == userId);
-                
+
             if (existingFavorite != null)
                 return Results.BadRequest("דף העבודה כבר נמצא במועדפים שלך");
-                
+
             // בדיקה אם דף העבודה קיים
             var worksheet = await context.Worksheets.FindAsync(favoriteDto.WorksheetId);
             if (worksheet == null)
                 return Results.NotFound("דף העבודה לא נמצא");
-                
+
             var favorite = new FavoriteWorksheet
             {
                 UserId = userId,
                 WorksheetId = favoriteDto.WorksheetId
             };
-            
+
             await context.FavoriteWorksheets.AddAsync(favorite);
             await context.SaveChangesAsync();
-            
+
             return Results.Created($"/api/favorites/{favorite.Id}", favorite);
         })
         .WithName("AddToFavorites")

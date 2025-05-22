@@ -302,13 +302,10 @@ routes.MapPost("/api/worksheets", [Authorize] async (Worksheet newWorksheet, App
 {
     try
     {
-        // קבלת כל הקטגוריות
         var categories = await context.Categories.ToListAsync();
         
-        // מיכל לתוצאות
         var results = new List<object>();
         
-        // עבור על כל קטגוריה ומצא דף עבודה רנדומלי או ראשון
         foreach (var category in categories)
         {
             // בדיקה אם יש דפי עבודה בקטגוריה

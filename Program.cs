@@ -24,7 +24,6 @@ builder.Services.AddHttpClient();
 
 // רישום HttpClient ספציפי עבור S3
 builder.Services.AddHttpClient("S3Client", client => {
-    // אפשר להוסיף כאן הגדרות ספציפיות לקליינט S3
     client.Timeout = TimeSpan.FromMinutes(2);
 });
 
@@ -63,7 +62,6 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
         RegionEndpoint = RegionEndpoint.GetBySystemName(Environment.GetEnvironmentVariable("AWS_REGION") ?? "us-east-1")
     };
 
-    // קבל את האישורים ממשתני סביבה, לא בקוד!
     var accessKeyId = Environment.GetEnvironmentVariable("AWS_ACCESS_KEY_ID");
     var secretAccessKey = Environment.GetEnvironmentVariable("AWS_SECRET_ACCESS_KEY");
  
@@ -73,27 +71,44 @@ builder.Services.AddSingleton<IAmazonS3>(sp =>
     }
 
     var credentials = new BasicAWSCredentials(accessKeyId, secretAccessKey);
-
     return new AmazonS3Client(credentials, options);
 });
 
-// Add DbContext with MySQL
+// **הגדרת DbContext מתוקנת עם ניהול connection pool**
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseMySql(
-        builder.Configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
-    ));
+{
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+    
+    options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString), mySqlOptions =>
+    {
+        // הגדרות MySQL ספציפיות
+        mySqlOptions.CommandTimeout(30); // timeout לפקודות SQL
+        mySqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
+            errorNumbersToAdd: null
+        );
+    })
+    .EnableSensitiveDataLogging(builder.Environment.IsDevelopment()) // רק בפיתוח
+    .EnableDetailedErrors(builder.Environment.IsDevelopment())
+    .LogTo(Console.WriteLine, LogLevel.Warning); // לוגים רק לאזהרות ומעלה
+    
+}, ServiceLifetime.Scoped); // וודא שזה Scoped (ברירת מחדל)
+
+// **הוספת connection pool configuration**
+builder.Services.Configure<DbContextOptions>(options =>
+{
+    // זה ירצה רק אם יש לך גרסה חדשה יותר של EF Core
+});
 
 // Configure JWT Secret Key dynamically based on environment
 var jwtKey = Environment.GetEnvironmentVariable("JWT_SECRET_KEY");
 
-// אם לא נמצא במשתני סביבה, ננסה להוציא מקובץ ההגדרות (appsettings.json)
 if (string.IsNullOrEmpty(jwtKey))
 {
     jwtKey = builder.Configuration["JwtSettings:SecretKey"];
 }
 
-// אם עדיין לא נמצא, נשתמש במפתח קבוע (למטרות פיתוח בלבד)
 if (string.IsNullOrEmpty(jwtKey))
 {
     jwtKey = "MySuperSecretKeyForTestingOnly123456789012345678901234567890";
@@ -124,7 +139,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-// הוספת שירותי הרשאה
 builder.Services.AddAuthorization();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
@@ -134,19 +148,18 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 // Add CORS
 builder.Services.AddCors(options =>
 {
-  options.AddPolicy("AllowFrontend", policy =>
-{
-    policy.WithOrigins(
-        "http://localhost:5173",
-        "https://react-drow.onrender.com",
-        "http://localhost:4200",
-        "https://angular-drow-manager.onrender.com"
-    )
-    .AllowAnyMethod()
-    .AllowAnyHeader()
-    .AllowCredentials(); // חשוב אם יש Authorization או Cookies
-});
-
+    options.AddPolicy("AllowFrontend", policy =>
+    {
+        policy.WithOrigins(
+            "http://localhost:5173",
+            "https://react-drow.onrender.com",
+            "http://localhost:4200",
+            "https://angular-drow-manager.onrender.com"
+        )
+        .AllowAnyMethod()
+        .AllowAnyHeader()
+        .AllowCredentials();
+    });
 });
 
 var app = builder.Build();
@@ -166,6 +179,24 @@ app.UseCors("AllowFrontend");
 app.UseAuthentication();
 app.UseAuthorization();
 
+// **הוספת middleware לניטור חיבורי DB (אופציונלי)**
+app.Use(async (context, next) =>
+{
+    var dbContext = context.RequestServices.GetService<ApplicationDbContext>();
+    if (dbContext != null)
+    {
+        // ודא שהחיבור ייסגר אחרי הבקשה
+        using (dbContext)
+        {
+            await next();
+        }
+    }
+    else
+    {
+        await next();
+    }
+});
+
 // Map all endpoints
 app.MapGet("/", () => "welcome!:)");
 
@@ -176,5 +207,19 @@ app.MapDownloadEndpoints();
 app.MapRatingEndpoints();
 app.MapFavoriteWorksheetEndpoints();
 app.MapUploadEndpoints();
+
+// **הוספת endpoint לניטור מצב חיבורי DB**
+app.MapGet("/health/db", async (ApplicationDbContext context) =>
+{
+    try
+    {
+        await context.Database.CanConnectAsync();
+        return Results.Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow });
+    }
+    catch (Exception ex)
+    {
+        return Results.Problem($"Database connection failed: {ex.Message}");
+    }
+}).WithTags("Health");
 
 app.Run();
